@@ -20,6 +20,7 @@ Each **meta-prompt** below is designed to be pasted directly into a Claude Code 
 - A Supabase account (free tier)
 - The **Salon Onboarding Form** filled out (see further below)
 - The **Google Calendar Sync Verification** completed (see further below)
+- The **Carrier Forwarding Verification** completed — this is a **go/no-go gate**, not optional. See [CHANGELOG.md — CH-002](CHANGELOG.md).
 
 ---
 
@@ -458,15 +459,20 @@ BOOKING INTENT:
 - Offer two paths: "I can check availability and get you booked right now,
   or I can text you a link to book at your convenience. Which would you prefer?"
 - "Book now" path:
-  1. Ask what service they want (if not already stated)
-  2. Ask if they have a stylist preference (skip for solo stylist salons)
-  3. Ask what day/time works for them
-  4. Call check_availability tool with service, stylist, date
-  5. Present 2-3 available slots: "We have 10am, 1pm, and 3:30pm open. Which works?"
-  6. Confirm before booking: "Just to confirm — a [service] with [stylist] on
+  1. Ask what service they want (if not already stated). If vague ("I need my
+     hair done"), ask: "What service are you looking for today?"
+  2. Ask if they have a stylist preference (skip for solo stylist salons). If
+     no preference: "Would you like whoever is available first?"
+  3. For variable-duration services, ask a qualifying question: "Is your hair
+     above or below your shoulders? That helps me find the right time slot."
+     (See CHANGELOG.md — CH-008)
+  4. Ask what day/time works for them
+  5. Call check_availability tool with service, stylist, date
+  6. Present 2-3 available slots: "We have 10am, 1pm, and 3:30pm open. Which works?"
+  7. Confirm before booking: "Just to confirm — a [service] with [stylist] on
      [day] at [time]. Sound good?"
-  7. Call hold_booking_slot tool
-  8. "You're all set! You'll get a text when it's confirmed."
+  8. Call hold_booking_slot tool
+  9. "You're all set! You'll get a text when it's confirmed."
 - "Text me a link" path:
   1. "What number should I text it to?" (or "Should I text it to this number?")
   2. Call send_sms tool with the booking link
@@ -479,12 +485,24 @@ FAQ INTENT:
   at [booking link]."
 - After answering, offer: "Would you like to book an appointment?"
 
+CANCEL / RESCHEDULE INTENT:
+- The AI CANNOT modify existing Vagaro appointments in Phase 1 (no API path).
+- If caller wants to cancel or reschedule: "I can't change existing appointments
+  directly, but let me connect you with [Owner Name] — or I can take a message
+  and they'll get right back to you."
+  → Offer transfer or take a detailed message
+- See CHANGELOG.md — CH-005 for design rationale
+
 TRANSFER INTENT:
 - If caller asks for a human: "Absolutely, let me connect you now."
   → Call transfer_to_number immediately. Don't ask follow-up questions.
-- If the AI fails to understand after 2 attempts: "I'm having trouble with
-  that — let me connect you with someone who can help."
-  → Call transfer_to_number
+- If transfer fails (no answer / voicemail): take a detailed message from the
+  caller, then trigger send_sms to salon owner with: "MISSED TRANSFER:
+  [Name] ([number]) called about [topic]. They asked: [summary]. Please
+  call back." See CHANGELOG.md — CH-003.
+- If the AI fails to understand after 2 attempts: "I'm having a little trouble
+  hearing — would it be easier if I texted you a booking link?" This gracefully
+  degrades to the "text me a link" path. See CHANGELOG.md — CH-006.
 - If caller sounds frustrated or upset: offer to transfer immediately
 
 RULES:
@@ -687,9 +705,10 @@ When the AI holds a slot during a call, our system sends three messages:
 
 2. To the SALON OWNER (immediately after hold):
    "NEW BOOKING: [Name] ([last 4 digits of phone]) — [Service] with [Stylist],
-   [time] [day]. Tap to confirm: [confirm link]"
+   [time] [day]. Check Vagaro for conflicts, then tap to confirm: [confirm link]"
 
-   The confirm link points to: GET /api/confirm/[confirmation_token]
+   The "check Vagaro for conflicts" prompt mitigates sync-gap double-booking —
+   see CHANGELOG.md — CH-001. The confirm link points to: GET /api/confirm/[confirmation_token]
 
 3. To the CALLER (after salon owner confirms):
    "You're confirmed! [Service] with [Stylist], [time] [day] at [Salon].
@@ -1016,18 +1035,26 @@ Each session is one focused Claude Code chat. Start fresh (`/clear`) between ses
 
 Call the number yourself and test each scenario:
 
+**Pre-flight gate (do this first):**
+- [ ] **Carrier forwarding verification** — test conditional forwarding from the salon owner's actual phone to the Twilio number. Try 3+ test calls. If it fails, switch to dedicated Twilio number with updated Google Business listing. This is a **go/no-go gate**. See [CHANGELOG.md — CH-002](CHANGELOG.md).
+
+**Call scenarios:**
 - [ ] "I'd like to book a haircut" → AI checks availability → offers times → books
 - [ ] "How much is a balayage?" → AI answers with price from knowledge base
 - [ ] "Can I speak to someone?" → AI transfers immediately
+- [ ] "I need to cancel my appointment Thursday" → AI explains it can't modify existing appointments, offers to transfer or take a message (CH-005)
+- [ ] "I want to reschedule" → same as cancel — transfer or message path (CH-005)
 - [ ] Vague request: "I need my hair done" → AI asks what service
+- [ ] No stylist preference: "whoever is available" → AI handles gracefully
 - [ ] "Text me a link to book" → AI asks for number → sends SMS with Vagaro link
 - [ ] Caller hangs up immediately → call logged as abandoned
-- [ ] Background noise → AI handles or asks to repeat
+- [ ] Background noise → AI handles or falls back to "want me to text you a link instead?" (CH-006)
 - [ ] Multiple questions in one call → AI handles each, then offers to book
 - [ ] Toggle agent OFF → call rings salon phone directly
 - [ ] Toggle agent ON → AI picks up again
 - [ ] Booking hold expires (wait 2 hours) → caller gets fallback SMS
 - [ ] Salon owner taps confirm link → caller gets confirmation SMS
+- [ ] Transfer fails (no answer) → AI takes message → salon owner gets SMS with caller details and summary (CH-003)
 
 ---
 
@@ -1082,7 +1109,9 @@ The playbook originally specified Retell AI. If you prefer Retell:
    - Retell fires a `call_ended` webhook with transcript + word-level timestamps
    - Different payload format, same data
 
-3. **Everything else stays the same:** booking logic, SMS flows, Google Calendar bridge, admin API, database schema, tests.
+3. **Enable Retell's denoising add-on** (+$0.005/min) — salons are noisy environments (hair dryers, music, chatter). This is on by default for salon deployments. See [CHANGELOG.md — CH-006](CHANGELOG.md).
+
+4. **Everything else stays the same:** booking logic, SMS flows, Google Calendar bridge, admin API, database schema, tests.
 
 The prompts are labeled with which voice platform they reference. Swap only the platform-specific ones.
 
@@ -1099,8 +1128,8 @@ The prompts are labeled with which voice platform they reference. Swap only the 
 **"SMS not being received"**
 → Toll-free number verification may be pending. Check Twilio console → Phone Numbers → your toll-free number → Messaging → Verification status.
 
-**"Conditional forwarding not working (T-Mobile)"**
-→ Known carrier issue. Test with `*67` prefix to hide caller ID and try again. If it still fails, consider porting the number to Twilio (Phase 3) instead of using conditional forwarding.
+**"Conditional forwarding not working"**
+→ This varies across carriers, phone models, and plan types — not just T-Mobile. Test with `*67` prefix to hide caller ID and try again. If it still fails on the salon owner's specific carrier, **fall back to a dedicated Twilio number** with updated Google Business listing and voicemail greeting directing callers to the new number. Don't attempt Phase 3 number porting as a workaround — that takes 2-4 weeks. See [CHANGELOG.md — CH-002](CHANGELOG.md).
 
 **"Hold expired but Google Calendar event still exists"**
 → The expiry cron may have stopped. Check `/health/detailed` for `holdExpiryRunning`. Restart the server if needed.
@@ -1110,6 +1139,9 @@ The prompts are labeled with which voice platform they reference. Swap only the 
 
 **"Vagaro API returns 403"**
 → API access requires Enterprise plan with credit card processing enabled. Contact Vagaro Enterprise Sales.
+
+**"Caller didn't get a reminder for their AI-booked appointment"**
+→ Vagaro sends automated reminders for real appointments, NOT for Personal Tasks. The caller only gets reminders after the salon owner creates the real appointment in Vagaro and enters the caller's correct phone number. Make sure the confirmation SMS to the salon owner prominently displays the caller's contact info. See [CHANGELOG.md — CH-004](CHANGELOG.md).
 
 ---
 
