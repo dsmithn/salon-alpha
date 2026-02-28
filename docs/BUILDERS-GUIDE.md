@@ -15,10 +15,61 @@ Each **meta-prompt** below is designed to be pasted directly into a Claude Code 
 - A code editor (VS Code recommended)
 - Node.js 20+ and npm
 - A Twilio account (free trial works)
-- An ElevenLabs account (free tier works to start) — *or Retell AI, see the Playbook for comparison*
+- An ElevenLabs account *or* a Retell AI account (see comparison below)
 - A Google Cloud account (free tier)
 - A Supabase account (free tier)
-- The **Salon Onboarding Form** filled out (see below)
+- The **Salon Onboarding Form** filled out (see further below)
+- The **Google Calendar Sync Verification** completed (see further below)
+
+---
+
+## Decision: ElevenLabs vs Retell AI
+
+Pick one before you start. The meta-prompts default to ElevenLabs. If you choose Retell, see "Adapting for Retell AI" at the bottom of this guide for which prompts to swap.
+
+| Factor | ElevenLabs | Retell AI |
+|--------|-----------|-----------|
+| **Voice quality** | Best in class — most natural-sounding TTS | Good — clear and professional |
+| **Response latency** | Sub-second | ~300-500ms (fastest in market) |
+| **Twilio integration** | Native (dashboard setup, zero code) | Managed ($2/month, Retell handles Twilio) |
+| **Tool calling** | Webhook server tools + system tools (transfer, end call) | `general_tools` array with custom functions |
+| **Call transfer** | Conference / Blind / SIP REFER — 3 modes | Warm transfer with context carryover |
+| **Cost per minute** | ~$0.08-0.15 (Twilio + ElevenLabs) | ~$0.07-0.12 (all-in, transparent) |
+| **Free tier** | Yes (limited minutes) | $10 free credits (~60-90 min) |
+| **Compliance** | Standard | SOC 2 Type II, HIPAA, GDPR included |
+| **Setup effort** | Low (native) to Medium (WebSocket bridge) | Medium (dashboard + API) |
+
+**Pick ElevenLabs if:** Voice quality matters most. It's a salon — callers hear the voice first, and a natural-sounding agent builds trust. Native Twilio integration means near-zero server setup for the voice layer.
+
+**Pick Retell if:** Conversational speed matters most. Retell's lower latency makes conversations feel more responsive. All-in pricing is simpler. Compliance certifications are included if you plan to scale to medical spas or similar.
+
+---
+
+## Google Calendar Sync Verification
+
+**Do this before writing any code.** The entire booking flow depends on Google Calendar events blocking Vagaro's online booking. This takes 5 minutes to verify.
+
+Vagaro Personal Tasks have a **"Block Online Booking" checkbox** that is enabled by default — dark brown on the calendar means blocked, light brown means not blocked. What we need to confirm is that *synced* Google Calendar events inherit this default.
+
+**Steps:**
+
+1. Make sure the salon's Vagaro account has [two-way Google Calendar sync enabled](https://support.vagaro.com/hc/en-us/articles/31275501148699-Sync-Vagaro-with-Google-Calendar)
+2. In Vagaro settings, verify that **"Require Acceptance for Personal Tasks" is OFF** — if it's on, synced tasks stay "pending" and **do not block online booking** until a manager approves them
+3. Create a test event in Google Calendar on the synced calendar — make it 1 hour, during a time that currently shows as available on Vagaro's online booking page
+4. Wait for sync (1-5 minutes)
+5. Check Vagaro's calendar — the event should appear as a Personal Task in **dark brown** (blocked) with a hand icon
+6. Go to the salon's Vagaro online booking page as a customer and try to book that same time slot — it **should not be available**
+7. Delete the test event from Google Calendar and verify it disappears from Vagaro on next sync
+
+| Result | What It Means | Action |
+|--------|--------------|--------|
+| Slot is blocked (dark brown, can't book online) | Google Calendar bridge works as designed | Proceed with the build |
+| Slot is NOT blocked (light brown, can still book online) | Synced events don't inherit the blocking default | You'll need to manually toggle blocking on synced tasks, or skip the Google Calendar bridge and go straight to Vagaro Enterprise API (Phase 2 architecture) |
+| "Require Acceptance" is ON and can't be turned off | Salon owner's Vagaro plan or policy requires approval | Personal Tasks won't block until approved — the hold flow won't work in real-time. Use the "text me a link" path only, or go straight to Vagaro Enterprise API |
+
+**If the test passes:** the Google Calendar bridge is safe to build on. Move on to the Onboarding Form and start building.
+
+**If the test fails:** skip MP-06 (Google Calendar Bridge) and build only the "text me a link" booking path for Phase 1. Plan to go straight to Vagaro Enterprise API integration in Phase 2 for real-time booking.
 
 ---
 
@@ -1053,6 +1104,9 @@ The prompts are labeled with which voice platform they reference. Swap only the 
 
 **"Hold expired but Google Calendar event still exists"**
 → The expiry cron may have stopped. Check `/health/detailed` for `holdExpiryRunning`. Restart the server if needed.
+
+**"Google Calendar event synced but doesn't block Vagaro online booking"**
+→ Check that the synced Personal Task is dark brown (not light brown) in Vagaro's calendar. If light brown, the "Block Online Booking" flag wasn't set. Also check that "Require Acceptance for Personal Tasks" is OFF in Vagaro settings — pending tasks don't block booking. If neither fixes it, synced events may not inherit the blocking default on your Vagaro plan. Fall back to "text me a link" only for Phase 1 and go straight to Vagaro Enterprise API in Phase 2.
 
 **"Vagaro API returns 403"**
 → API access requires Enterprise plan with credit card processing enabled. Contact Vagaro Enterprise Sales.
