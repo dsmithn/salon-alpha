@@ -21,6 +21,9 @@ The full technical specification. Architecture, call flows, Vagaro integration, 
 ### [Builder's Guide →](builders-guide)
 The implementation kit. Account setup, a library of copy-paste meta-prompts for Claude Code, and a session-by-session build plan. Read this to **build it**.
 
+### [Changelog →](changelog)
+Addenda from external reviews and design decisions. Cross-referenced from the playbook and builder's guide wherever the original docs were updated.
+
 ---
 
 ## The 60-Second Version

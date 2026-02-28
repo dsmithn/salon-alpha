@@ -9,3 +9,5 @@ nav:
     url: /playbook
   - title: "Builder's Guide"
     url: /builders-guide
+  - title: Changelog
+    url: /changelog

@@ -81,7 +81,7 @@ AI responds (one of three paths):
 ```
 
 > **Risk: Carrier Conditional Forwarding (go/no-go gate)**
-> Conditional call forwarding behavior varies across carriers, phone models, and plan types — not just T-Mobile. [^2] **Carrier forwarding verification is a hard go/no-go gate, not just a risk to monitor.** If forwarding fails testing with the salon owner's specific carrier, fall back to a dedicated Twilio number with updated Google Business listing and voicemail greeting. See [CHANGELOG.md — CH-002](CHANGELOG.md) for the full decision framework.
+> Conditional call forwarding behavior varies across carriers, phone models, and plan types — not just T-Mobile. [^2] **Carrier forwarding verification is a hard go/no-go gate, not just a risk to monitor.** If forwarding fails testing with the salon owner's specific carrier, fall back to a dedicated Twilio number with updated Google Business listing and voicemail greeting. See [CHANGELOG.md — CH-002](changelog) for the full decision framework.
 
 ---
 
@@ -115,7 +115,7 @@ This gives the caller a graceful fallback to the "text me a link" path if the ho
 > **Important: There is no one-click "convert" button.** Vagaro's "Convert to Appointment" feature only exists for Google Calendar-imported events viewed in certain contexts, not for Personal Tasks created via API sync. The actual workflow is: create the real appointment first (double-booking is allowed), then delete the Personal Task. This works reliably but is two steps, not one. [^8]
 
 > **Risk: Google Calendar Sync Latency + Double-Booking Gap**
-> Vagaro's docs describe the sync as taking "a few moments" with no SLA. [^4] In practice this appears to be 1-5 minutes, but Vagaro launched two-way sync only in December 2024 — the feature is roughly a year old. During this sync window, the AI-held slot is not yet visible in Vagaro — someone could book the same slot directly on Vagaro, creating a true conflict. The salon owner's confirmation SMS prompts them to check Vagaro for conflicts before confirming. If sync reliability becomes an issue, the fallback is the Vagaro Enterprise API (webhook add-on $10/month) to create Personal Tasks directly. [^9] Build monitoring from day one. See [CHANGELOG.md — CH-001](CHANGELOG.md) for the full mitigation plan.
+> Vagaro's docs describe the sync as taking "a few moments" with no SLA. [^4] In practice this appears to be 1-5 minutes, but Vagaro launched two-way sync only in December 2024 — the feature is roughly a year old. During this sync window, the AI-held slot is not yet visible in Vagaro — someone could book the same slot directly on Vagaro, creating a true conflict. The salon owner's confirmation SMS prompts them to check Vagaro for conflicts before confirming. If sync reliability becomes an issue, the fallback is the Vagaro Enterprise API (webhook add-on $10/month) to create Personal Tasks directly. [^9] Build monitoring from day one. See [CHANGELOG.md — CH-001](changelog) for the full mitigation plan.
 
 > **Note: `events.watch()` is optional for Phase 1.**
 > The confirmation flow is driven by the salon owner tapping a link, not by monitoring Google Calendar changes. `events.watch()` [^6] becomes useful in Phase 2 if you want to automatically detect when the salon owner creates the real appointment in Vagaro (eliminating the manual confirm step). If you do use it, note that watch channels expire after a maximum of 7 days and must be renewed programmatically.
@@ -165,11 +165,11 @@ Example greeting: *"Thanks for calling [Salon]! This call is assisted by AI and 
 Build the AI agent's personality and knowledge:
 
 - **Booking flow:** Offer the caller two options — "I can check availability and book you now, or text you a link to book at your convenience." For the "book now" path: trigger a mid-call function call to Google Calendar API [^18] to check availability, offer 2-3 open slots, create the event when the caller picks one, and notify the salon owner. For the "text a link" path: collect the caller's number and send the Vagaro booking URL via SMS.
-- **Incomplete info handling:** Callers often don't specify everything upfront. For unknown stylist: *"Do you have a preferred stylist, or would you like whoever is available first?"* For unspecified service: *"What service are you looking for today?"* For variable-duration services (e.g., balayage on different hair lengths): *"Is your hair above or below your shoulders? That helps me find the right time slot."* See [CHANGELOG.md — CH-005, CH-008](CHANGELOG.md).
+- **Incomplete info handling:** Callers often don't specify everything upfront. For unknown stylist: *"Do you have a preferred stylist, or would you like whoever is available first?"* For unspecified service: *"What service are you looking for today?"* For variable-duration services (e.g., balayage on different hair lengths): *"Is your hair above or below your shoulders? That helps me find the right time slot."* See [CHANGELOG.md — CH-005, CH-008](changelog).
 - **FAQ handling:** Load 10-15 Q&As specific to the salon (pricing for each service, hours, cancellation policy, parking, stylists and their specialties)
-- **Cancel/reschedule handling:** The AI should not attempt to modify existing Vagaro appointments in Phase 1. Offer to transfer or take a message. See [CHANGELOG.md — CH-005](CHANGELOG.md).
-- **Transfer behavior:** If caller asks for a human or the AI can't handle the request, execute a call transfer [^19] to the salon owner's cell. If transfer fails, take a detailed message and text it to the salon owner with caller's name, number, and request summary. See [CHANGELOG.md — CH-003](CHANGELOG.md).
-- **Noise fallback:** If the AI can't understand after 2 attempts, offer to text a booking link instead: *"I'm having a little trouble hearing — would it be easier if I texted you a booking link?"* This gracefully degrades to the "text me a link" path. Enable Retell's denoising add-on (+$0.005/min) by default for salon environments. See [CHANGELOG.md — CH-006](CHANGELOG.md).
+- **Cancel/reschedule handling:** The AI should not attempt to modify existing Vagaro appointments in Phase 1. Offer to transfer or take a message. See [CHANGELOG.md — CH-005](changelog).
+- **Transfer behavior:** If caller asks for a human or the AI can't handle the request, execute a call transfer [^19] to the salon owner's cell. If transfer fails, take a detailed message and text it to the salon owner with caller's name, number, and request summary. See [CHANGELOG.md — CH-003](changelog).
+- **Noise fallback:** If the AI can't understand after 2 attempts, offer to text a booking link instead: *"I'm having a little trouble hearing — would it be easier if I texted you a booking link?"* This gracefully degrades to the "text me a link" path. Enable Retell's denoising add-on (+$0.005/min) by default for salon environments. See [CHANGELOG.md — CH-006](changelog).
 - **Conversation limits:** Keep it concise. Handle the request, confirm, wrap up. Don't let the AI ramble.
 
 Key parameters to tune:
@@ -323,7 +323,7 @@ Before building, sit down and get answers to these:
 - No client-facing dashboard
 - No billing system
 - No multi-salon management
-- No outbound calls or reminders (TCPA minefield — later). Note: Vagaro sends automated reminders for real appointments but NOT for Personal Tasks. Callers booked via the AI only get Vagaro reminders after the salon owner creates the real appointment with correct contact info. See [CHANGELOG.md — CH-004](CHANGELOG.md).
+- No outbound calls or reminders (TCPA minefield — later). Note: Vagaro sends automated reminders for real appointments but NOT for Personal Tasks. Callers booked via the AI only get Vagaro reminders after the salon owner creates the real appointment with correct contact info. See [CHANGELOG.md — CH-004](changelog).
 - No Spanish language support
 - No integration with platforms other than Vagaro
 - No automated Personal Task → appointment conversion (manual for now)

@@ -20,7 +20,7 @@ Each **meta-prompt** below is designed to be pasted directly into a Claude Code 
 - A Supabase account (free tier)
 - The **Salon Onboarding Form** filled out (see further below)
 - The **Google Calendar Sync Verification** completed (see further below)
-- The **Carrier Forwarding Verification** completed — this is a **go/no-go gate**, not optional. See [CHANGELOG.md — CH-002](CHANGELOG.md).
+- The **Carrier Forwarding Verification** completed — this is a **go/no-go gate**, not optional. See [CHANGELOG.md — CH-002](changelog).
 
 ---
 
@@ -1036,7 +1036,7 @@ Each session is one focused Claude Code chat. Start fresh (`/clear`) between ses
 Call the number yourself and test each scenario:
 
 **Pre-flight gate (do this first):**
-- [ ] **Carrier forwarding verification** — test conditional forwarding from the salon owner's actual phone to the Twilio number. Try 3+ test calls. If it fails, switch to dedicated Twilio number with updated Google Business listing. This is a **go/no-go gate**. See [CHANGELOG.md — CH-002](CHANGELOG.md).
+- [ ] **Carrier forwarding verification** — test conditional forwarding from the salon owner's actual phone to the Twilio number. Try 3+ test calls. If it fails, switch to dedicated Twilio number with updated Google Business listing. This is a **go/no-go gate**. See [CHANGELOG.md — CH-002](changelog).
 
 **Call scenarios:**
 - [ ] "I'd like to book a haircut" → AI checks availability → offers times → books
@@ -1109,7 +1109,7 @@ The playbook originally specified Retell AI. If you prefer Retell:
    - Retell fires a `call_ended` webhook with transcript + word-level timestamps
    - Different payload format, same data
 
-3. **Enable Retell's denoising add-on** (+$0.005/min) — salons are noisy environments (hair dryers, music, chatter). This is on by default for salon deployments. See [CHANGELOG.md — CH-006](CHANGELOG.md).
+3. **Enable Retell's denoising add-on** (+$0.005/min) — salons are noisy environments (hair dryers, music, chatter). This is on by default for salon deployments. See [CHANGELOG.md — CH-006](changelog).
 
 4. **Everything else stays the same:** booking logic, SMS flows, Google Calendar bridge, admin API, database schema, tests.
 
@@ -1129,7 +1129,7 @@ The prompts are labeled with which voice platform they reference. Swap only the 
 → Toll-free number verification may be pending. Check Twilio console → Phone Numbers → your toll-free number → Messaging → Verification status.
 
 **"Conditional forwarding not working"**
-→ This varies across carriers, phone models, and plan types — not just T-Mobile. Test with `*67` prefix to hide caller ID and try again. If it still fails on the salon owner's specific carrier, **fall back to a dedicated Twilio number** with updated Google Business listing and voicemail greeting directing callers to the new number. Don't attempt Phase 3 number porting as a workaround — that takes 2-4 weeks. See [CHANGELOG.md — CH-002](CHANGELOG.md).
+→ This varies across carriers, phone models, and plan types — not just T-Mobile. Test with `*67` prefix to hide caller ID and try again. If it still fails on the salon owner's specific carrier, **fall back to a dedicated Twilio number** with updated Google Business listing and voicemail greeting directing callers to the new number. Don't attempt Phase 3 number porting as a workaround — that takes 2-4 weeks. See [CHANGELOG.md — CH-002](changelog).
 
 **"Hold expired but Google Calendar event still exists"**
 → The expiry cron may have stopped. Check `/health/detailed` for `holdExpiryRunning`. Restart the server if needed.
@@ -1141,7 +1141,7 @@ The prompts are labeled with which voice platform they reference. Swap only the 
 → API access requires Enterprise plan with credit card processing enabled. Contact Vagaro Enterprise Sales.
 
 **"Caller didn't get a reminder for their AI-booked appointment"**
-→ Vagaro sends automated reminders for real appointments, NOT for Personal Tasks. The caller only gets reminders after the salon owner creates the real appointment in Vagaro and enters the caller's correct phone number. Make sure the confirmation SMS to the salon owner prominently displays the caller's contact info. See [CHANGELOG.md — CH-004](CHANGELOG.md).
+→ Vagaro sends automated reminders for real appointments, NOT for Personal Tasks. The caller only gets reminders after the salon owner creates the real appointment in Vagaro and enters the caller's correct phone number. Make sure the confirmation SMS to the salon owner prominently displays the caller's contact info. See [CHANGELOG.md — CH-004](changelog).
 
 ---
 
