@@ -2,7 +2,7 @@
 
 **For: Mark (and anyone who builds the next one)**
 
-This is the implementation kit. The [Playbook](../playbook) tells you what we're building and why. This guide tells you how — with copy-paste prompts for Claude Code that generate working code at each step.
+This is the implementation kit. The Playbook tells you what we're building and why. This guide tells you how — with copy-paste prompts for Claude Code that generate working code at each step.
 
 ---
 

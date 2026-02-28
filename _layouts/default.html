@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="{{ site.lang | default: 'en-US' }}">
+  <head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    {% seo %}
+    <link rel="stylesheet" href="{{ '/assets/css/style.css?v=' | append: site.github.build_revision | relative_url }}">
+
+    <style>
+      /* Tab navigation */
+      .site-nav {
+        background: rgba(255, 255, 255, 0.08);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+        text-align: center;
+        padding: 0;
+        margin: 0;
+      }
+
+      .site-nav ul {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: inline-flex;
+        gap: 0;
+      }
+
+      .site-nav li {
+        margin: 0;
+      }
+
+      .site-nav a {
+        display: block;
+        padding: 0.75rem 1.5rem;
+        color: rgba(255, 255, 255, 0.7);
+        text-decoration: none;
+        font-size: 0.95rem;
+        font-weight: 500;
+        letter-spacing: 0.02em;
+        border-bottom: 3px solid transparent;
+        transition: color 0.2s, border-color 0.2s;
+      }
+
+      .site-nav a:hover {
+        color: #fff;
+        border-bottom-color: rgba(255, 255, 255, 0.4);
+      }
+
+      .site-nav a.active {
+        color: #fff;
+        border-bottom-color: #fff;
+      }
+
+      /* Remove the back links since we have tabs now */
+      .main-content a[href="/"] {
+        /* Keep functional but tabs handle nav */
+      }
+
+      /* Tighten header since nav provides context */
+      .page-header {
+        padding-bottom: 1rem;
+      }
+
+      @media screen and (max-width: 42em) {
+        .site-nav a {
+          padding: 0.6rem 1rem;
+          font-size: 0.85rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="page-header" role="banner">
+      <h1 class="project-name">{{ site.title | default: page.title }}</h1>
+      <h2 class="project-tagline">{{ site.description | default: page.description }}</h2>
+      {% if site.github.is_project_page %}
+        <a href="{{ site.github.repository_url }}" class="btn">View on GitHub</a>
+      {% endif %}
+    </header>
+
+    <nav class="site-nav" role="navigation">
+      <ul>
+        {% for item in site.nav %}
+          <li>
+            <a href="{{ item.url | relative_url }}"
+               {% if page.url == item.url %}class="active"{% endif %}>
+              {{ item.title }}
+            </a>
+          </li>
+        {% endfor %}
+      </ul>
+    </nav>
+
+    <main id="content" class="main-content" role="main">
+      {{ content }}
+
+      <footer class="site-footer">
+        {% if site.github.is_project_page %}
+          <span class="site-footer-owner">
+            <a href="{{ site.github.repository_url }}">{{ site.github.repository_name }}</a>
+            is maintained by <a href="{{ site.github.owner_url }}">{{ site.github.owner_name }}</a>.
+          </span>
+        {% endif %}
+      </footer>
+    </main>
+  </body>
+</html>
