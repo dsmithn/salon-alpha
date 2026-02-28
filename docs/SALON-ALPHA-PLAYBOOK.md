@@ -1,7 +1,7 @@
 # Salon Alpha Playbook
 
 **For: [Salon Name]**
-**Classification: Confidential**
+**Classification: Internal Draft**
 
 ---
 
