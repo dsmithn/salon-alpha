@@ -115,6 +115,12 @@ GREETING PREFERENCE:
   [ ] Record owner's voice
   [ ] Use TTS (type the greeting): ____________________
 
+RING COUNT:
+  [ ] 0 — AI answers immediately (pure AI mode)
+  [ ] 3-4 — Phone rings first, AI picks up if no answer (default)
+  [ ] Custom: ____ rings
+  See CHANGELOG.md — CH-010.
+
 AFTER-HOURS BEHAVIOR:
   [ ] AI answers 24/7
   [ ] AI answers during business hours only (ring phone otherwise)
@@ -263,6 +269,7 @@ Add a seed script (src/db/seed.ts) that inserts default salon_config:
   - transfer_number: (from SALON_OWNER_PHONE env var)
   - greeting_message: "Thanks for calling! This call is assisted by AI and may be recorded. How can I help you today?"
   - booking_hold_minutes: 120
+  - ring_count: 4
 
 Run the migration against the local docker-compose postgres to verify it works.
 ````
@@ -282,7 +289,11 @@ voice webhook in src/webhooks/twilio-voice.ts.
 The call router checks whether the AI agent is enabled:
 
 1. Read the "agent_enabled" flag from the salon_config table
-2. If enabled: return TwiML that connects to our ElevenLabs agent
+2. Read the "ring_count" from salon_config (not hardcoded — see CH-010).
+   Ring count determines forwarding behavior: 0 = AI answers immediately,
+   3-4 = phone rings first. In Phase 2, this may be overridden by
+   calendar-aware smart routing (see CH-012).
+3. If enabled: return TwiML that connects to our ElevenLabs agent
    (for now, just return a <Say> greeting + <Gather> as a placeholder —
    we'll wire ElevenLabs in the next prompt)
 3. If disabled: return TwiML that <Dial>s the salon owner's phone number
@@ -577,14 +588,18 @@ Requirements:
    createHold(params: {
      calendarId: string;
      summary: string;       // "HOLD: Balayage — Sarah J."
-     description: string;   // Customer name, phone (last 4), service, via AI booking
+     description: string;   // Standardized format — see below
      startTime: string;     // ISO 8601
      endTime: string;       // ISO 8601
    }): Promise<{ eventId: string }>
 
    - Create a Google Calendar event with the given details
    - Set the event color to a distinct "hold" color (banana/yellow = colorId "5")
-   - Include "AI BOOKING HOLD — pending confirmation" in the description
+   - Use the standardized description format (see CH-013):
+     "AI BOOKING HOLD — [Full Name] ([last 4 digits of phone]), [Service]
+      with [Stylist], [Time]. Pending confirmation."
+     Example: "AI BOOKING HOLD — Sarah Johnson (0123), Balayage with
+      Jessica, 2pm Thursday. Pending confirmation."
    - Return the event ID for later deletion if the hold expires
 
    deleteHold(params: {
@@ -844,6 +859,7 @@ Endpoints:
    - transfer_number: string (phone number format)
    - greeting_message: string
    - booking_hold_minutes: number (15-480 range)
+   - ring_count: number (0-10 range, 0 = AI answers immediately)
 
 7. GET /api/admin/analytics?from=&to=
    Returns: {

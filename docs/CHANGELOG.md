@@ -127,3 +127,68 @@ The reviewer suggested skipping conditional forwarding entirely and using a dedi
 **Decision:** Keep conditional forwarding as the primary path. Add dedicated number as the documented fallback if forwarding fails carrier testing (see CH-002). Don't lead with it.
 
 *Note: This doesn't contradict the reviewer — they suggested it as an option, not a mandate. We're choosing the primary path based on business context.*
+
+> **Correction (2026-02-28):** This entry conflated two distinct concepts. "Dedicated Twilio number" (a *new* number as a Phase 1 fallback if forwarding fails) is not the same as "number porting" (transferring the salon's *existing* number to Twilio for full programmatic control). The rejection above stands for Phase 1 — don't lead with a new number. However, Mark's long-term vision was always porting the salon's existing number, not creating a new one. Number porting is the primary long-term delivery model, not a nice-to-have. See CH-011.
+
+---
+
+## [2026-02-28] Team Feedback — Mark & up_the_down
+
+**Source:** Discord discussion between Mark and up_the_down
+
+### CH-010: Ring count should be a configurable setting, not hardcoded
+
+Mark's insight: *"0 -> pure AI mode, X -> mixed human/AI"* and *"the configuration change is really just how many rings before forwarding."*
+
+The playbook currently says "rings your phone 3-4x first" as if this is fixed behavior. In reality, the ring count determines the fundamental mode of operation:
+- **0 rings** = pure AI mode (AI answers immediately, phone never rings)
+- **3-4 rings** = mixed mode (phone rings first, AI picks up if no answer)
+- **Custom** = salon owner's preference based on their workflow
+
+This should be a configurable setting in `salon_config`, not a hardcoded assumption. The onboarding form should capture the salon owner's preference, and the call router should read it from the database.
+
+*Affects: PLAYBOOK §The Full Call Flow, PLAYBOOK §Decisions table, BUILDERS-GUIDE §Onboarding Form, BUILDERS-GUIDE MP-02 (salon_config seed), MP-03 (call router), MP-10 (admin API config keys).*
+
+---
+
+### CH-011: Number porting is the long-term delivery model, not a Phase 3 nice-to-have
+
+Mark's vision: *"Scrap your phone bill. We transfer your number. Pay us X. You get customized AI support."*
+
+Phase 3 currently reads as an optional upgrade. Mark sees number porting as the core value proposition once the product is proven with the alpha salon. The pitch is simple: the salon stops paying their phone carrier, ports their number to us, and gets AI-powered call handling as a managed service. This reframes Phase 3 from "technical upgrade" to "the actual business model."
+
+The CH-009 entry incorrectly conflated "dedicated Twilio number" (a new number) with "number porting" (transferring the salon's existing number). These are fundamentally different — see the correction note added to CH-009.
+
+*Affects: PLAYBOOK §Phase 3, CHANGELOG §CH-009 (correction added).*
+
+---
+
+### CH-012: Calendar-aware smart routing
+
+up_the_down's idea: if the salon owner has an active appointment right now (according to Google Calendar / Vagaro), pick up immediately — they're busy and can't answer. If the calendar is clear, let it ring — they might be free to pick up themselves.
+
+This inverts the static ring-count logic with dynamic, context-aware routing. Instead of always ringing X times, the system checks the salon owner's current calendar state:
+- **Owner is busy** (active appointment right now) → AI answers immediately (0 rings)
+- **Owner is free** (no current appointment) → phone rings first (configured ring count)
+
+This is a Phase 2+ feature — requires calendar integration to be stable and reliable before layering routing logic on top.
+
+*Affects: PLAYBOOK §Phase 2 (new feature), BUILDERS-GUIDE MP-03 (future note).*
+
+---
+
+### CH-013: Embed caller details in Vagaro Personal Tasks
+
+Mark confirmed: *"there is an api to block off time directly in vagaro then she can just convert it. we can dump all of the AI collected details from the customer in there too."*
+
+The playbook already says "with caller details in the description" but doesn't specify the format. Making this explicit ensures consistency and makes it easy for the salon owner to scan and act on holds.
+
+**Standard description format for AI booking holds:**
+
+```
+AI BOOKING HOLD — [Full Name] ([last 4 digits of phone]), [Service] with [Stylist], [Time]. Pending confirmation.
+```
+
+Example: `AI BOOKING HOLD — Sarah Johnson (0123), Balayage with Jessica, 2pm Thursday. Pending confirmation.`
+
+*Affects: BUILDERS-GUIDE MP-06 (createHold description format).*

@@ -26,7 +26,7 @@ Caller dials salon
        │
        ▼
 Call forwards to our Twilio number
-(conditional forwarding — rings your phone 3-4x first)
+(conditional forwarding — configurable ring count, default 3-4 rings)
        │
        ▼
 Retell AI agent picks up
@@ -255,6 +255,7 @@ Once the Google Calendar bridge proves the concept, upgrade to direct Vagaro API
 - Personal Tasks created directly via API (no Google Calendar intermediary)
 - Customer data synced via Vagaro webhooks → local PostgreSQL for caller ID lookup
 - Returning callers greeted by name: *"Hi Sarah, welcome back to [Salon]!"*
+- **Calendar-aware smart routing:** If the salon owner has an active appointment right now, AI answers immediately (they're busy). If the calendar is clear, phone rings first (they might pick up). This replaces the static ring count with dynamic, context-aware routing. See [CHANGELOG.md — CH-012](changelog).
 
 **What stays the same:**
 - Retell AI agent (same prompts, same voice)
@@ -272,11 +273,14 @@ Once the Google Calendar bridge proves the concept, upgrade to direct Vagaro API
 
 ---
 
-## Phase 3: Number Porting (Month 2-3)
+## Phase 3: Number Porting — The Long-Term Delivery Model (Month 2-3)
 
-Port the salon's existing phone number to Twilio for full programmatic control.
+Port the salon's existing phone number to Twilio for full programmatic control. This is not a nice-to-have — it's the core business model once the alpha proves the concept. See [CHANGELOG.md — CH-011](changelog).
+
+**The pitch:** *"Scrap your phone bill. We transfer your number. Pay us X. You get customized AI support."* The salon stops paying their phone carrier, ports their number to us, and gets AI-powered call handling as a managed service. Their callers, their regulars, their printed materials — nothing changes for anyone except that the phone is always answered.
 
 **What this enables:**
+- **Managed service model:** The salon pays one bill (us) instead of carrier + separate AI tool. We own the full stack.
 - **Scheduled routing:** AI answers during business hours overflow and after-hours. During quiet periods, calls ring through to the salon phone first.
 - **Caller ID passthrough:** Twilio can preserve the original caller's number on forwarded calls (requires passing `CallToken` — not automatic) [^26]
 - **Full call analytics:** Every inbound call flows through your infrastructure, not just forwarded ones
@@ -299,6 +303,7 @@ Before building, sit down and get answers to these:
 | What should the AI NOT do? | Boundaries matter — e.g., never quote prices for services not on the list, never promise same-day availability without checking | AI offers to transfer to human for anything outside its knowledge base |
 | Greeting voice | Record the owner's voice for the greeting, or use TTS? | Record the owner (more authentic) |
 | After-hours behavior | Answer 24/7 or only during business hours? | 24/7 — missed calls happen most after hours |
+| Ring count preference | How many rings before AI picks up? 0 = AI answers immediately (pure AI mode), 3-4 = phone rings first (mixed mode). See [CHANGELOG.md — CH-010](changelog). | 3-4 rings (mixed mode) |
 
 ---
 
