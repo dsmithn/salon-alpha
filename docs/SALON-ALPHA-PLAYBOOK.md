@@ -9,7 +9,7 @@
 
 An AI receptionist that answers the salon's phone when you can't pick up. A caller dials in, the AI greets them warmly, and handles the conversation. It does three things:
 
-1. **Bookings** — checks real availability via Google Calendar, offers open slots, and texts the caller a confirmation link
+1. **Bookings** — two paths: the AI can check real availability and hold a slot (salon owner confirms, caller gets a text), or simply text the caller a link to book on Vagaro at their convenience
 2. **FAQs** — answers questions about pricing, hours, cancellation policy, parking, etc. from a knowledge base you define
 3. **Transfers** — if the caller wants a human, the AI forwards them to your cell or takes a message
 
@@ -43,13 +43,22 @@ Caller speaks
 AI responds (one of three paths):
        │
        ├─► BOOKING INTENT
-       │   AI checks Google Calendar in real-time (mid-call function call)
-       │   → "Jessica has 2pm and 4pm Thursday. Which works?"
-       │   → Caller picks a slot
-       │   → AI creates Google Calendar event (syncs to Vagaro as Personal Task)
-       │   → AI texts caller a confirmation link from a toll-free number
-       │   → Google Calendar push notification triggers our confirmation flow
-       │   → When caller confirms via link, real appointment is created
+       │   AI: "I can check availability and get you booked right now,
+       │         or text you a link to book at your convenience."
+       │   │
+       │   ├─► "Book me now"
+       │   │   AI checks Google Calendar in real-time (mid-call function call)
+       │   │   → "Jessica has 2pm and 4pm Thursday. Which works?"
+       │   │   → Caller picks a slot
+       │   │   → AI creates Google Calendar event (syncs to Vagaro as Personal Task)
+       │   │   → AI: "You're all set — you'll get a text when it's confirmed!"
+       │   │   → Salon owner gets SMS notification with booking details
+       │   │   → Salon owner confirms → caller gets confirmation text
+       │   │
+       │   └─► "Text me a link"
+       │       AI: "What number should I send it to?"
+       │       → AI texts the salon's Vagaro booking page link
+       │       → Done — caller books at their convenience
        │
        ├─► FAQ INTENT
        │   AI answers from knowledge base
@@ -78,19 +87,29 @@ Vagaro's API has no "Create Appointment" endpoint. [^3] The only write path is c
 
 **How confirmation works:**
 
-When the AI books a slot, it creates a Google Calendar event and texts the caller a confirmation link. We monitor for the caller's confirmation using **Google Calendar push notifications** via the `events.watch()` API [^6] — this gives us near-real-time notification when the event is updated, without polling. When the caller confirms:
+The **salon owner** confirms — not the caller. The caller already asked to book; making them click a link to "confirm" what they just asked for is confusing and adds friction.
 
-1. The salon owner sees a Personal Task on their Vagaro calendar with notes: *"AI BOOKING — Sarah Johnson, 555-0123, Balayage with Jessica."*
-2. The owner creates the real appointment in Vagaro (takes ~30-60 seconds — Vagaro allows unlimited double-booking [^7])
-3. The owner deletes the Personal Task
+When the AI books a slot via the "book me now" path:
+
+1. AI creates Google Calendar event with caller details in the description → syncs to Vagaro as Personal Task
+2. AI tells the caller: *"You're all set for 2pm Thursday with Jessica. You'll get a text when it's confirmed!"*
+3. Our system texts the **salon owner**: *"NEW BOOKING: Sarah Johnson (555-0123) — Balayage with Jessica, 2pm Thursday. Tap to confirm: [link]"*
+4. Salon owner taps the confirm link → our server texts the **caller**: *"You're confirmed! Balayage with Jessica, 2pm Thursday at [Salon]. See you then!"*
+5. Salon owner creates the real appointment in Vagaro (takes ~30-60 seconds — Vagaro allows unlimited double-booking [^7]) and deletes the Personal Task
+
+**If the salon owner doesn't confirm within 2 hours:**
+1. The hold expires — we delete the Google Calendar event (which removes the Vagaro Personal Task on next sync)
+2. We text the caller: *"Sorry, we couldn't confirm your 2pm Thursday slot. Book anytime at: [Vagaro booking link]"*
+
+This gives the caller a graceful fallback to the "text me a link" path if the hold falls through.
 
 > **Important: There is no one-click "convert" button.** Vagaro's "Convert to Appointment" feature only exists for Google Calendar-imported events viewed in certain contexts, not for Personal Tasks created via API sync. The actual workflow is: create the real appointment first (double-booking is allowed), then delete the Personal Task. This works reliably but is two steps, not one. [^8]
 
 > **Risk: Google Calendar Sync Latency**
 > Vagaro's docs describe the sync as taking "a few moments" with no SLA. [^4] In practice this appears to be 1-5 minutes, but Vagaro launched two-way sync only in December 2024 — the feature is roughly a year old. Build monitoring from day one. If sync reliability becomes an issue, the fallback is the Vagaro Enterprise API (webhook add-on $10/month) to create Personal Tasks directly. [^9]
 
-> **Risk: `events.watch()` Channel Expiration**
-> Google Calendar push notification channels expire after a maximum of 7 days. Your webhook server must renew watch channels before they expire, or you'll silently stop receiving notifications. [^6]
+> **Note: `events.watch()` is optional for Phase 1.**
+> The confirmation flow is driven by the salon owner tapping a link, not by monitoring Google Calendar changes. `events.watch()` [^6] becomes useful in Phase 2 if you want to automatically detect when the salon owner creates the real appointment in Vagaro (eliminating the manual confirm step). If you do use it, note that watch channels expire after a maximum of 7 days and must be renewed programmatically.
 
 ---
 
@@ -136,7 +155,7 @@ Example greeting: *"Thanks for calling [Salon]! This call is assisted by AI and 
 
 Build the AI agent's personality and knowledge:
 
-- **Booking flow:** When caller wants to book, trigger a mid-call function call to Google Calendar API [^18] to check availability. Offer 2-3 open slots. When caller picks one, create the event and trigger confirmation SMS.
+- **Booking flow:** Offer the caller two options — "I can check availability and book you now, or text you a link to book at your convenience." For the "book now" path: trigger a mid-call function call to Google Calendar API [^18] to check availability, offer 2-3 open slots, create the event when the caller picks one, and notify the salon owner. For the "text a link" path: collect the caller's number and send the Vagaro booking URL via SMS.
 - **FAQ handling:** Load 10-15 Q&As specific to the salon (pricing for each service, hours, cancellation policy, parking, stylists and their specialties)
 - **Transfer behavior:** If caller asks for a human or the AI can't handle the request, execute a call transfer [^19] to the salon owner's cell
 - **Conversation limits:** Keep it concise. Handle the request, confirm, wrap up. Don't let the AI ramble.
@@ -170,21 +189,35 @@ booking_completed | caller_satisfied | outcome | notes
 
 Host the webhook handler on **Railway ($5/month) or Render ($7/month)**. [^21] [^22]
 
-**Hour 6: Confirmation SMS flow.**
+**Hour 6: SMS flows.**
 
-Set up the toll-free SMS number for sending confirmation texts. When the AI books a slot:
+Set up the toll-free SMS number and two SMS flows:
 
+**Flow A: "Book me now" — salon-side confirmation**
+
+When the AI holds a slot during a call:
 1. Create Google Calendar event with caller details in the description
-2. Send SMS from toll-free number: *"Hi Sarah! Your 2pm Thursday balayage with Jessica at [Salon] is being held. Tap to confirm: [link]"*
-3. `events.watch()` monitors for confirmation [^6]
-4. If no confirmation in 30 minutes, send a follow-up: *"Still want that 2pm Thursday slot? Tap to confirm before it opens up: [link]"*
-5. If no confirmation in 2 hours, delete the Google Calendar event (which removes the Vagaro Personal Task on next sync)
+2. Text the **salon owner**: *"NEW BOOKING: Sarah Johnson (555-0123) — Balayage with Jessica, 2pm Thursday. Tap to confirm: [link]"*
+3. Text the **caller**: *"Hi Sarah! We're holding 2pm Thursday with Jessica at [Salon] for you. You'll get a text when it's confirmed."*
+4. If salon owner taps confirm → text caller: *"You're confirmed! Balayage with Jessica, 2pm Thursday at [Salon]. See you then!"*
+5. If no confirmation in 2 hours → delete the Google Calendar event, text caller: *"Sorry, we couldn't confirm your 2pm Thursday slot. Book anytime at: [Vagaro link]"*
+
+The confirm link points to a simple page on your webhook server (one endpoint, returns a success message, triggers the confirmation SMS). No `events.watch()` needed.
+
+**Flow B: "Text me a link" — booking link only**
+
+When the caller just wants a link:
+1. Text the **caller**: *"Here's the booking link for [Salon]: [Vagaro booking URL]. Book anytime!"*
+
+This is triggered by a Retell mid-call function call [^18] — the AI collects the phone number and your server sends the SMS. ~30 lines of code.
 
 **Why toll-free instead of a local number?** Since February 2025, all carriers block unregistered local number (10DLC) business texting. [^23] Registering for 10DLC takes 15+ days and requires brand registration ($4-15) plus campaign registration ($15 one-time + $10/month) per salon. [^24] A toll-free number has a separate, simpler verification process, adequate throughput (~3 messages/second — more than enough for one salon), and no registration wait. 10DLC is a scaling concern for when you have dozens of salons — not an alpha blocker.
 
 **Hour 7: Self-testing round 2.**
 
-Call the number through the full flow: booking → SMS received → tap confirmation link → Google Calendar event updated → Vagaro sync confirmed. Fix what breaks.
+Test both booking flows end-to-end:
+- **"Book me now" path:** booking → caller gets "holding" SMS → salon owner gets notification SMS → salon owner taps confirm → caller gets "confirmed" SMS → Google Calendar event syncs to Vagaro. Also test: salon owner ignores → 2-hour timeout → caller gets fallback SMS with Vagaro link.
+- **"Text me a link" path:** caller asks for a link → receives SMS with Vagaro booking URL. Fix what breaks.
 
 ### Sunday — Real Callers + Analysis
 
@@ -213,8 +246,8 @@ Once the Google Calendar bridge proves the concept, upgrade to direct Vagaro API
 
 **What stays the same:**
 - Retell AI agent (same prompts, same voice)
-- Toll-free SMS confirmations
-- The manual appointment conversion workflow (create real appointment → delete Personal Task)
+- Toll-free SMS flows (salon-side confirmation + booking link)
+- The manual appointment conversion workflow (salon owner creates real appointment → deletes Personal Task)
 - Call logging to Supabase
 
 **Requirements for Vagaro Enterprise API:**
@@ -250,7 +283,7 @@ Before building, sit down and get answers to these:
 | Which scheduling platform? | Determines integration path. Vagaro = Google Calendar bridge → Enterprise API. Square = direct API (free). Others = SMS booking link only. | Vagaro (what you use) |
 | Solo stylist or multi-stylist? | Affects availability logic and stylist matching | Solo (simpler) |
 | Service list with durations and prices | AI needs this to offer accurate availability and answer pricing questions | Get the full list from the Vagaro account |
-| Preferred booking confirmation method | Text link to confirm vs. "we'll call you back to confirm" | Text link |
+| Preferred booking method | AI offers both "book now" (AI holds slot, salon confirms) and "text me a link" (Vagaro booking URL). Disable either? | Both enabled |
 | What should the AI NOT do? | Boundaries matter — e.g., never quote prices for services not on the list, never promise same-day availability without checking | AI offers to transfer to human for anything outside its knowledge base |
 | Greeting voice | Record the owner's voice for the greeting, or use TTS? | Record the owner (more authentic) |
 | After-hours behavior | Answer 24/7 or only during business hours? | 24/7 — missed calls happen most after hours |
